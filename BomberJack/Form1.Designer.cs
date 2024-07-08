@@ -49,7 +49,6 @@
             this.Field.TabIndex = 2;
             this.Field.TabStop = false;
             this.Field.Text = "Playing Field";
-            this.Field.Paint += new System.Windows.Forms.PaintEventHandler(this.DrawField);
             this.Field.MouseClick += ClickField;
 
             // 
