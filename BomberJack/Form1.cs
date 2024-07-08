@@ -11,7 +11,8 @@ namespace BomberJack
         private Color[] playerColor = { Color.Gray, Color.Red, Color.Blue, Color.Purple, Color.Green }; // item 0 will be ignored. Players count from 1 to 4
         private Board board;
 
-        private int player = 1;
+        private int player;
+        private int maxPlayer;
 
 
         public class Board
@@ -110,11 +111,6 @@ namespace BomberJack
 
                 Graphics g = e.Graphics;
 
-                // Draw a string on the PictureBox.
-                g.DrawString("This is a diagonal line drawn on the control",
-                    fnt, System.Drawing.Brushes.Blue, new Point(30, 30));
-
-
                 // Draw a vertical lines
                 for (int i = 0; i <= this.countX; i++)
                 {
@@ -173,10 +169,26 @@ namespace BomberJack
         public Form1(int countX, int countY)
         {
             InitializeComponent();
+            this.Field.MouseClick += this.ClickField;
             this.countX = countX;
             this.countY = countY;
 
             this.board = new Board(this.countX, this.countY, this.Field, this.playerColor);
+        }
+
+        private void buttonStart_Click(object sender, EventArgs e)
+        {
+            this.numericUpDownPlayers.Enabled = false;
+            this.buttonPlayerIndicator.Visible = true;
+
+            this.player = 1;
+            this.maxPlayer = (int)this.numericUpDownPlayers.Value;
+        }
+
+        public void DrawPlayerIndicator(object sender, PaintEventArgs e)
+        {
+            this.buttonPlayerIndicator.BackColor = this.playerColor[this.player];
+            this.buttonPlayerIndicator.Text = "Player " + this.player.ToString();
         }
 
         private void ClickField(object sender, MouseEventArgs e)
@@ -186,7 +198,8 @@ namespace BomberJack
                 if (board.Click(e.X, e.Y, this.player))
                 { // when return true, go to the next player
                     this.player++;
-                    if (this.player > 4) this.player = 1;
+                    if (this.player > this.maxPlayer) this.player = 1;
+                    this.buttonPlayerIndicator.Invalidate();
                 }
             }
         }
