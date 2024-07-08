@@ -1,6 +1,7 @@
 using Microsoft.VisualBasic.Devices;
 using System.Drawing;
 using System.Media;
+using System.Security.Cryptography.Xml;
 using System.Windows.Forms;
 
 namespace BomberJack
@@ -11,7 +12,7 @@ namespace BomberJack
         private Color[] playerColor = { Color.Gray, Color.Red, Color.Blue, Color.Purple, Color.Green }; // item 0 will be ignored. Players count from 1 to 4
         private Board board;
 
-        private int player;
+        private int player=0;
         private int maxPlayer;
 
 
@@ -19,19 +20,16 @@ namespace BomberJack
         {
             public class GameCell
             {
-                public int count;
-                public int owner;
-                public int maxCapacity;
+                public int count = 0;
+                public int owner = 0;
+                public int maxCapacity = 4;
+                public int[,] explosionDirections = { { -1, 0 }, { 0, -1 }, { 1, 0 }, { 0, 1 } };
 
                 public bool hasReachedCapacity { get { return this.count > this.maxCapacity; } }
 
                 public GameCell()
                 {
-                    this.count = 0;
-                    this.owner = 0;
-                    this.maxCapacity = 4;
                 }
-
                 public void ReduceCount()
                 {
                     this.count -= maxCapacity;
@@ -73,18 +71,25 @@ namespace BomberJack
                 for (int x = 1; x < this.countX - 1; x++)
                 {
                     this.board[x, 0].maxCapacity = 3;
+                    this.board[x, 0].explosionDirections = new int[,] { { -1, 0 },            { 1, 0 }, { 0, 1 } };
                     this.board[x, this.countY - 1].maxCapacity = 3;
+                    this.board[x, this.countY - 1].explosionDirections = new int[,] { { -1, 0 }, { 0, -1 }, { 1, 0 }           };
                 }
                 for (int y = 1; y < this.countY - 1; y++)
                 {
                     this.board[0, y].maxCapacity = 3;
+                    this.board[0, y].explosionDirections = new int[,] {            { 0, -1 }, { 1, 0 }, { 0, 1 } };
                     this.board[this.countX - 1, y].maxCapacity = 3;
+                    this.board[this.countX - 1, y].explosionDirections = new int[,] { { -1, 0 }, { 0, -1 }, { 0, 1 } };
                 }
                 this.board[0, 0].maxCapacity = 2;
+                this.board[0, 0].explosionDirections = new int[,] { { 0, 1 }, { 1, 0 } };
                 this.board[this.countX - 1, 0].maxCapacity = 2;
+                this.board[this.countX - 1, 0].explosionDirections = new int[,] { { -1, 0}, { 0, 1 } };
                 this.board[0, this.countY - 1].maxCapacity = 2;
+                this.board[0, this.countY - 1].explosionDirections = new int[,] { { 0 , -1 }, { 1, 0 } };
                 this.board[this.countX - 1, this.countY - 1].maxCapacity = 2;
-
+                this.board[this.countX - 1, this.countY - 1].explosionDirections = new int[,] { { -1, 0 }, { 0, -1 } };
                 this.field.Paint += new System.Windows.Forms.PaintEventHandler(this.Draw);
             }
 
@@ -133,11 +138,19 @@ namespace BomberJack
                     {
                         if (board[x, y].owner != 0)
                         {
-                            SolidBrush blueBrush = new SolidBrush(this.playerColor[board[x, y].owner]);
+                            SolidBrush brush;
+                            if (board[x, y].count <= board[x, y].maxCapacity)
+                            {
+                                brush = new SolidBrush(this.playerColor[board[x, y].owner]);
+                            }
+                            else
+                            {
+                                brush = new SolidBrush(Color.Yellow);
+                            }
                             Rectangle rect = new Rectangle(
                                 this.windowLeft + 2 + x * this.cellSizeX, this.windowTop + 2 + y * this.cellSizeY,
                                 this.cellSizeX - 3, this.cellSizeY - 3);
-                            g.FillRectangle(blueBrush, rect);
+                            g.FillRectangle(brush, rect);
 
                             g.DrawString(board[x, y].count.ToString(),
                                 fnt, System.Drawing.Brushes.White, new Point(this.windowLeft + (this.cellSizeX >> 2) + (x * this.cellSizeX), this.windowTop + (this.cellSizeY >> 2) + (y * this.cellSizeY)));
@@ -160,9 +173,42 @@ namespace BomberJack
                 this.board[x, y].owner = player;
                 this.board[x, y].count++;
 
+                this.CheckBoard(player);
+
                 // Redraw
                 this.field.Invalidate();
                 return true;
+            }
+
+            private void CheckBoard(int player)
+            {
+                bool dirty = true;
+
+                while (dirty)
+                {
+                    dirty = false;
+                    for (int x = 0; x < this.countX; x++)
+                    {
+                        for (int y = 0; y < this.countY; y++)
+                        {
+                            if (this.board[x, y].count > this.board[x, y].maxCapacity)
+                            {
+                                // explode!!!!!
+                                dirty = true;
+                                for (int n = 0; n <= this.board[x, y].explosionDirections.GetUpperBound(0); n++)
+                                {
+                                    int dx = this.board[x, y].explosionDirections[n, 0];
+                                    int dy = this.board[x, y].explosionDirections[n, 1];
+                                    this.board[x + dx, y + dy].count++;
+                                    this.board[x + dx, y + dy].owner = player;
+                                    this.field.Invalidate();
+                                }
+                                this.board[x, y].ReduceCount();
+                                this.field.Invalidate();
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -193,13 +239,16 @@ namespace BomberJack
 
         private void ClickField(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Left)
+            if (player != 0) // cannot play before the game has started
             {
-                if (board.Click(e.X, e.Y, this.player))
-                { // when return true, go to the next player
-                    this.player++;
-                    if (this.player > this.maxPlayer) this.player = 1;
-                    this.buttonPlayerIndicator.Invalidate();
+                if (e.Button == MouseButtons.Left)
+                {
+                    if (board.Click(e.X, e.Y, this.player))
+                    { // when return true, go to the next player
+                        this.player++;
+                        if (this.player > this.maxPlayer) this.player = 1;
+                        this.buttonPlayerIndicator.Invalidate();
+                    }
                 }
             }
         }
