@@ -8,7 +8,7 @@ using System.Windows.Forms;
  
 namespace BomberJack
 {
-    public partial class Form1 : Form
+    public partial class Form : System.Windows.Forms.Form
     {
         private int countX, countY;
         private Color[] playerColor = { Color.Gray, Color.Red, Color.Blue, Color.Purple, Color.Green }; // item 0 will be ignored. Players count from 1 to 4
@@ -193,12 +193,7 @@ namespace BomberJack
                 this.board[x, y].owner = currentPlayer;
                 this.board[x, y].count++;
 
-                this.CheckBoard(currentPlayer);
-
-                this.CountScores();
-
-                //redraw
-                this.field.Invalidate();
+                playerWorker = currentPlayer;
                 return true;
             }
 
@@ -224,9 +219,11 @@ namespace BomberJack
                                     this.board[x + dx, y + dy].count++;
                                     this.board[x + dx, y + dy].owner = player;
                                     this.field.Invalidate();
+                                    Thread.Sleep(100);
                                 }
                                 this.board[x, y].ReduceCount();
                                 this.field.Invalidate();
+                                Thread.Sleep(100);
                             }
                         }
                     }
@@ -253,9 +250,32 @@ namespace BomberJack
                     }
                 }
             }
+
+            public bool stopWorker = false;
+            public int playerWorker = 0;
+            public void Worker()
+            {
+                while (!stopWorker)
+                {
+                    if (playerWorker != 0)
+                    {
+                        this.CheckBoard(playerWorker);
+
+                        this.CountScores();
+
+                        //redraw
+                        this.field.Invalidate();
+
+                        playerWorker = 0;
+                    }
+
+                    Thread.Sleep(10);
+                }
+
+            }
         }
 
-    public Form1(int countX, int countY)
+    public Form(int countX, int countY)
         {
             InitializeComponent();
             this.Field.MouseClick += this.ClickField;
@@ -266,6 +286,8 @@ namespace BomberJack
             for (int i = 0; i <= 4; i++) { this.player[i] = new Player(this.playerColor[i]); }
             this.board = new Board(this.countX, this.countY, this.Field, this.player);
         }
+
+
 
         private void buttonStart_Click(object sender, EventArgs e)
         {
@@ -298,6 +320,9 @@ namespace BomberJack
 
             this.board = new Board(this.countX, this.countY, this.Field, this.player);
             this.Field.Invalidate();
+
+            Thread thread = new Thread(new ThreadStart(this.board.Worker));
+            thread.Start();
         }
 
         public void DrawPlayerIndicator(object sender, PaintEventArgs e)
@@ -312,17 +337,20 @@ namespace BomberJack
             {
                 if (e.Button == MouseButtons.Left)
                 {
-                    if (board.Click(e.X, e.Y, this.currentPlayer))
+                    if (this.board.playerWorker == 0)
                     {
-                        this.label1.Text = this.player[1].score.ToString();
-                        this.label2.Text = this.player[2].score.ToString();
-                        this.label3.Text = this.player[3].score.ToString();
-                        this.label4.Text = this.player[4].score.ToString();
+                        if (board.Click(e.X, e.Y, this.currentPlayer))
+                        {
+                            this.label1.Text = this.player[1].score.ToString();
+                            this.label2.Text = this.player[2].score.ToString();
+                            this.label3.Text = this.player[3].score.ToString();
+                            this.label4.Text = this.player[4].score.ToString();
 
-                        // when return true, go to the next player
-                        this.currentPlayer++;
-                        if (this.currentPlayer > this.maxPlayer) this.currentPlayer = 1;
-                        this.buttonPlayerIndicator.Invalidate();
+                            // when return true, go to the next player
+                            this.currentPlayer++;
+                            if (this.currentPlayer > this.maxPlayer) this.currentPlayer = 1;
+                            this.buttonPlayerIndicator.Invalidate();
+                        }
                     }
                 }
             }
