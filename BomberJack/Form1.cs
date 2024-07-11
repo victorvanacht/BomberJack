@@ -5,7 +5,7 @@ using System.Security.Cryptography.Xml;
 using System.Windows.Forms;
 
 
-
+ 
 namespace BomberJack
 {
     public partial class Form1 : Form
@@ -17,6 +17,7 @@ namespace BomberJack
         private int currentPlayer = 0;
         private Player[] player;
         private int maxPlayer;
+        private int fieldSize;
 
         public class Player
         {
@@ -133,6 +134,7 @@ namespace BomberJack
                 this.windowBottom = this.windowTop + this.windowSizeY;
 
                 Graphics g = e.Graphics;
+                g.Clear(SystemColors.Control);
 
                 // Draw a vertical lines
                 for (int i = 0; i <= this.countX; i++)
@@ -154,12 +156,12 @@ namespace BomberJack
                 {
                     for (int y = 0; y < this.countY; y++)
                     {
-                        if (board[x, y].owner != 0)
+                        if (this.board[x, y].owner != 0)
                         {
                             SolidBrush brush;
-                            if (board[x, y].count <= board[x, y].maxCapacity)
+                            if (this.board[x, y].count <= this.board[x, y].maxCapacity)
                             {
-                                brush = new SolidBrush(this.player[board[x, y].owner].color);
+                                brush = new SolidBrush(this.player[this.board[x, y].owner].color);
                             }
                             else
                             {
@@ -269,9 +271,12 @@ namespace BomberJack
         {
             this.currentPlayer = 1;
             this.maxPlayer = (int)this.numericUpDownPlayers.Value;
+            this.fieldSize = (int)this.numericUpDownFieldSize.Value;
 
             this.numericUpDownPlayers.Enabled = false;
+            this.numericUpDownFieldSize.Enabled = false;
             this.buttonPlayerIndicator.Visible = true;
+            this.buttonStart.Enabled = false;
 
             this.label1.Visible = true;
             this.labelPlayer1Score.Visible= true;
@@ -287,6 +292,12 @@ namespace BomberJack
                 this.label4.Visible = true; ;
                 this.labelPlayer4Score.Visible = true;
             }
+
+            this.countX = this.fieldSize;
+            this.countY = this.fieldSize;
+
+            this.board = new Board(this.countX, this.countY, this.Field, this.player);
+            this.Field.Invalidate();
         }
 
         public void DrawPlayerIndicator(object sender, PaintEventArgs e)
