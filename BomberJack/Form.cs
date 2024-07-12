@@ -2,6 +2,7 @@ using Microsoft.VisualBasic.Devices;
 using System.Drawing;
 using System.Media;
 using System.Security.Cryptography.Xml;
+using System.Threading;
 using System.Windows.Forms;
 
 
@@ -18,6 +19,8 @@ namespace BomberJack
         private Player[] player;
         private int maxPlayer;
         private int fieldSize;
+
+        private Thread workerThread;
 
         public class Player
         {
@@ -70,13 +73,15 @@ namespace BomberJack
 
             private Font fnt = new Font("Arial", 10);
             private GroupBox field;
+            private Form form;
             private Player[] player;
 
-            public Board(int countX, int countY, GroupBox field, Player[] player)
+            public Board(int countX, int countY, GroupBox field, Form form, Player[] player)
             {
                 this.countX = countX;
                 this.countY = countY;
                 this.field = field;
+                this.form = form;
                 this.player = player;
 
                 this.board = new GameCell[countX, countY];
@@ -197,39 +202,6 @@ namespace BomberJack
                 return true;
             }
 
-            private void CheckBoard(int player)
-            {
-                bool dirty = true;
-
-                while (dirty)
-                {
-                    dirty = false;
-                    for (int x = 0; x < this.countX; x++)
-                    {
-                        for (int y = 0; y < this.countY; y++)
-                        {
-                            if (this.board[x, y].count > this.board[x, y].maxCapacity)
-                            {
-                                // explode!!!!!
-                                dirty = true;
-                                for (int n = 0; n <= this.board[x, y].explosionDirections.GetUpperBound(0); n++)
-                                {
-                                    int dx = this.board[x, y].explosionDirections[n, 0];
-                                    int dy = this.board[x, y].explosionDirections[n, 1];
-                                    this.board[x + dx, y + dy].count++;
-                                    this.board[x + dx, y + dy].owner = player;
-                                    this.field.Invalidate();
-                                    Thread.Sleep(100);
-                                }
-                                this.board[x, y].ReduceCount();
-                                this.field.Invalidate();
-                                Thread.Sleep(100);
-                            }
-                        }
-                    }
-                }
-            }
-
             private void CountScores()
             {
                 // reset all score counters to zero
@@ -249,6 +221,21 @@ namespace BomberJack
                         }
                     }
                 }
+
+                // check if players are dead
+                for (int i=1; i<this.player.Length; i++) // skip player 0!
+                {
+                    if ((this.player[i].score == 0) && (this.player[i].hasPlayed))
+                    {
+                        this.player[i].isKilled = true;
+                    }
+                }
+
+
+                this.form.label1.Invoke((MethodInvoker)delegate { this.form.label1.Text = this.player[1].score.ToString(); });
+                this.form.label1.Invoke((MethodInvoker)delegate { this.form.label2.Text = this.player[2].score.ToString(); });
+                this.form.label1.Invoke((MethodInvoker)delegate { this.form.label3.Text = this.player[3].score.ToString(); });
+                this.form.label1.Invoke((MethodInvoker)delegate { this.form.label4.Text = this.player[4].score.ToString(); });
             }
 
             public bool stopWorker = false;
@@ -259,7 +246,40 @@ namespace BomberJack
                 {
                     if (playerWorker != 0)
                     {
-                        this.CheckBoard(playerWorker);
+                        this.player[playerWorker].hasPlayed = true;
+                        bool dirty = true;
+
+                        while (dirty && !stopWorker)
+                        {
+                            dirty = false;
+                            for (int x = 0; x < this.countX; x++)
+                            {
+                                for (int y = 0; y < this.countY; y++)
+                                {
+                                    if (this.board[x, y].count > this.board[x, y].maxCapacity)
+                                    {
+                                        // explode!!!!!
+                                        dirty = true;
+                                        for (int n = 0; n <= this.board[x, y].explosionDirections.GetUpperBound(0); n++)
+                                        {
+                                            int dx = this.board[x, y].explosionDirections[n, 0];
+                                            int dy = this.board[x, y].explosionDirections[n, 1];
+                                            this.board[x + dx, y + dy].count++;
+                                            this.board[x + dx, y + dy].owner = playerWorker;
+                                            this.field.Invalidate();
+                                            Thread.Sleep(100);
+                                        }
+                                        this.board[x, y].ReduceCount();
+                                        this.field.Invalidate();
+                                        Thread.Sleep(100);
+                                    }
+
+                                    if (stopWorker) break;
+                                }
+
+                                if (stopWorker) break;
+                            }
+                        }
 
                         this.CountScores();
 
@@ -275,16 +295,23 @@ namespace BomberJack
             }
         }
 
-    public Form(int countX, int countY)
+        private void FormClosingEvent(Object sender, FormClosingEventArgs e)
+        {
+            this.board.stopWorker= true;
+            this.workerThread.Join();
+        }
+
+
+        public Form()
         {
             InitializeComponent();
             this.Field.MouseClick += this.ClickField;
-            this.countX = countX;
-            this.countY = countY;
 
             this.player = new Player[5];
             for (int i = 0; i <= 4; i++) { this.player[i] = new Player(this.playerColor[i]); }
-            this.board = new Board(this.countX, this.countY, this.Field, this.player);
+
+
+            this.FormClosing += this.FormClosingEvent;
         }
 
 
@@ -318,11 +345,11 @@ namespace BomberJack
             this.countX = this.fieldSize;
             this.countY = this.fieldSize;
 
-            this.board = new Board(this.countX, this.countY, this.Field, this.player);
+            this.board = new Board(this.countX, this.countY, this.Field, this, this.player);
             this.Field.Invalidate();
 
-            Thread thread = new Thread(new ThreadStart(this.board.Worker));
-            thread.Start();
+            workerThread = new Thread(new ThreadStart(this.board.Worker));
+            workerThread.Start();
         }
 
         public void DrawPlayerIndicator(object sender, PaintEventArgs e)
@@ -337,19 +364,40 @@ namespace BomberJack
             {
                 if (e.Button == MouseButtons.Left)
                 {
-                    if (this.board.playerWorker == 0)
+                    if (this.board != null) // this shouldnt happen
                     {
-                        if (board.Click(e.X, e.Y, this.currentPlayer))
+                        if (this.board.playerWorker == 0)
                         {
-                            this.label1.Text = this.player[1].score.ToString();
-                            this.label2.Text = this.player[2].score.ToString();
-                            this.label3.Text = this.player[3].score.ToString();
-                            this.label4.Text = this.player[4].score.ToString();
+                            if (board.Click(e.X, e.Y, this.currentPlayer))
+                            {
+                                // when return true, go to the next player
 
-                            // when return true, go to the next player
-                            this.currentPlayer++;
-                            if (this.currentPlayer > this.maxPlayer) this.currentPlayer = 1;
-                            this.buttonPlayerIndicator.Invalidate();
+                                int prevPlayer = currentPlayer;
+
+                                this.currentPlayer++;
+
+                                //@@@@ this doesnt work because the isKilled will be updated in another thread, and we can't wait for that in this GUI thread
+
+                                bool newPlayerSelected = false;
+                                while ((!newPlayerSelected) && (prevPlayer != this.currentPlayer))
+                                {
+                                    if (this.currentPlayer > this.maxPlayer) this.currentPlayer = 1;
+                                    if (this.player[currentPlayer].isKilled)
+                                    {
+                                        this.currentPlayer++;
+                                    }
+                                    else
+                                    {
+                                        newPlayerSelected = true;
+                                    }
+                                }
+
+                                if (currentPlayer == prevPlayer)
+                                {
+                                    MessageBox.Show("We have a winner!", "");
+                                }
+                                this.buttonPlayerIndicator.Invalidate();
+                            }
                         }
                     }
                 }

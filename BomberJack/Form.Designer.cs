@@ -228,7 +228,7 @@
             0,
             0});
             this.numericUpDownFieldSize.Minimum = new decimal(new int[] {
-            4,
+            2,
             0,
             0,
             0});
@@ -236,12 +236,12 @@
             this.numericUpDownFieldSize.Size = new System.Drawing.Size(51, 23);
             this.numericUpDownFieldSize.TabIndex = 15;
             this.numericUpDownFieldSize.Value = new decimal(new int[] {
-            4,
+            2,
             0,
             0,
             0});
             // 
-            // Form1
+            // Form
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -261,7 +261,7 @@
             this.Controls.Add(this.labelNumberPlayers);
             this.Controls.Add(this.Field);
             this.Controls.Add(this.buttonPlayerIndicator);
-            this.Name = "Form1";
+            this.Name = "Form";
             this.Text = "Form1";
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownPlayers)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownFieldSize)).EndInit();
